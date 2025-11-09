@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>设备选择</title>
+    <style>
+        .video {
+            width: 100%; /* 宽度占满父容器 */
+            height: auto; /* 高度自动，保持原始宽高比 */
+            max-width: 100%; /* 防止超出容器 */
+            display: block; /* 去除底部空白间隙 */
+            background: #000; /* 可选：黑底，避免加载前白屏 */
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <h1>
+            <span>设备枚举示例</span>
+        </h1>
+        <div class="row">
+            <div class="col">
+                音频输入
+                <select class="form-control" id="audioInput" name=""></select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                音频输出
+                <select class="form-control" id="audioOutput" name=""></select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                视频输入
+                <select class="form-control" id="videoInput" name=""></select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <video class="video" id='video' autoPlay playsInline></video>
+
+                <br>
+
+                <button type="button" class="btn btn-primary" onClick="test()">测试</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+<script>
+    //当前选择的音频输入设备
+    let selectedAudioDevice;
+    //当前选择的音频输出设备
+    let selectedAudioOutputDevice;
+    //当前选择的视频输入设备
+    let selectedVideoDevice;
+    //视频输入设备列表
+    let videoDevices = [];
+    //音频输入设备列表
+    let audioDevices = [];
+    //音频输出设备列表
+    let audioOutputDevices = [];
+
+    $(document).ready(async function () {
+        let data = await updateDevices()
+
+        if (selectedAudioDevice === "" && data.audioDevices.length > 0) {
+            selectedAudioDevice = data.audioDevices[0].deviceId
+        }
+        if (selectedAudioOutputDevice === "" && data.audioOutputDevices.length > 0) {
+            selectedAudioOutputDevice = data.audioOutputDevices[0].deviceId
+        }
+        if (selectedVideoDevice === "" && data.videoDevices.length > 0) {
+            selectedVideoDevice = data.videoDevices[0].deviceId
+        }
+    })
+
+    function updateSelect(data) {
+        let html = "";
+
+        $("#audioInput").html(html);
+        for (let device of data.audioDevices) {
+            html += "<option value='" + device.deviceId + "'>" + "[" + device.deviceId + "] " + device.label + "</option>"
+        }
+        $("#audioInput").html(html);
+
+        html = "";
+        $("#audioOutput").html(html);
+        for (let device of data.audioOutputDevices) {
+            html += "<option value='" + device.deviceId + "'>" + "[" + device.deviceId + "] " + device.label + "</option>"
+        }
+        $("#audioOutput").html(html);
+
+        html = "";
+        $("#videoInput").html(html);
+        for (let device of data.videoDevices) {
+            html += "<option value='" + device.deviceId + "'>" + "[" + device.deviceId + "] " + device.label + "</option>"
+        }
+        $("#videoInput").html(html);
+    }
+
+    $(document).on("change", "#audioInput", function () {
+        let val = $(this).val()
+        selectedAudioDevice = val;
+        setTimeout(test, 100);
+    })
+
+    $(document).on("change", "#audioOutput", function () {
+        let val = $(this).val();
+        selectedAudioOutputDevice = val;
+        let video = $("#video")[0];
+
+        if (typeof video.sinkId !== 'undefined') {
+            //调用HTMLMediaElement的setSinkId方法改变输出源
+            video.setSinkId(val)
+                .then(() => {
+                    console.log(`音频输出设备设置成功: ${val}`);
+                })
+                .catch(error => {
+                    console.log(error)
+                });
+        } else {
+            console.warn('你的浏览器不支持输出设备选择.');
+        }
+    })
+
+    $(document).on("change", "#videoInput", function () {
+        let val = $(this).val()
+        selectedVideoDevice = val;
+        setTimeout(test, 100);
+    })
+
+    async function updateDevices() {
+        try {
+            let devices = await navigator.mediaDevices.enumerateDevices()
+            //使用循环迭代设备列表
+            for (let device of devices) {
+                //过滤出视频输入设备
+                if (device.kind === 'videoinput') {
+                    videoDevices.push(device);
+                    //过滤出音频输入设备
+                } else if (device.kind === 'audioinput') {
+                    audioDevices.push(device);
+                    //过滤出音频输出设备
+                } else if (device.kind === 'audiooutput') {
+                    audioOutputDevices.push(device);
+                }
+            }
+
+            let data = {videoDevices, audioDevices, audioOutputDevices};
+
+            updateSelect(data);
+
+            return data
+        } catch (err) {
+            console.log(err)
+        }
+    }
+
+    function test() {
+        let constraints = {
+            //设置音频设备Id
+            audio: {deviceId: selectedAudioDevice ? {exact: selectedAudioDevice} : undefined},
+            //设置视频设备Id
+            video: {deviceId: selectedVideoDevice ? {exact: selectedVideoDevice} : undefined}
+        };
+        //根据约束条件获取数据流
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then((stream) => {
+                //成功返回音视频流
+                window.stream = stream;
+                $("#video")[0].srcObject = stream;
+            }).catch((err) => {
+            console.log(err);
+        });
+    }
+</script>
+</html>

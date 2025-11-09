@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>webrtc示例-截取视频</title>
+    <style>
+        .video, .canvas {
+            width: 100%; /* 宽度占满父容器 */
+            height: auto; /* 高度自动，保持原始宽高比 */
+            max-width: 100%; /* 防止超出容器 */
+            display: block; /* 去除底部空白间隙 */
+            background: #000; /* 可选：黑底，避免加载前白屏 */
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <h1>
+                    <span>截取视频示例</span>
+                </h1>
+                <div>
+                    <video class="video" id='video' playsInline autoPlay></video>
+                    <br>
+                    <canvas class="canvas" id='canvas'></canvas>
+                </div>
+                <button type="button" class="btn btn-primary" onClick="takeSnap()">截屏</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+
+    $(document).ready(function () {
+        openVideo()
+    })
+
+    //约束条件
+    const constraints = window.constraints = {
+        //禁用音频
+        audio: false,
+        //启用视频
+        video: true
+    };
+
+    async function openVideo() {
+        try {
+            //根据约束条件获取媒体
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('handleSuccess:');
+            handleSuccess(stream);
+        } catch (e) {
+            handleError(e);
+        }
+    }
+
+    //截屏处理
+    function takeSnap() {
+        //获取画布对象
+        let canvas = $("#canvas")[0];
+        let video = $("#video")[0];
+        //设置画面宽度
+        canvas.width = video.videoWidth;
+        //设置画面高度
+        canvas.height = video.videoHeight;
+        //根据视频对象,xy坐标,画布宽,画布高绘制位图
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    }
+
+    function handleSuccess(stream) {
+        let video = $("#video");
+
+        video[0].srcObject = stream;
+    }
+
+    //注意！！！！！！！！！！
+    //要使用webrtc，必须用https，要配置ssl，不然将无法获取到设备
+    function handleError(error) {
+        console.log('navigator.MediaDevices.getUserMedia error: ', error.message, error.name);
+    }
+</script>
+</body>
+</html>

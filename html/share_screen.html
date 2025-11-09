@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>webrtc示例-共享屏幕</title>
+    <style>
+        .video {
+            width: 100%; /* 宽度占满父容器 */
+            height: auto; /* 高度自动，保持原始宽高比 */
+            max-width: 100%; /* 防止超出容器 */
+            display: block; /* 去除底部空白间隙 */
+            background: #000; /* 可选：黑底，避免加载前白屏 */
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <h1>
+                    <span>共享屏幕示例</span>
+                </h1>
+                <video class="video" id="video" autoPlay playsInline></video>
+                <br>
+                <button type="button" class="btn btn-primary" onClick="openVideo()">开始共享</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    //约束条件
+    const constraints = window.constraints = {
+        //禁用音频
+        audio: false,
+        //启用视频
+        video: true
+    };
+
+    async function openVideo() {
+        try {
+            //根据约束条件获取媒体
+            const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+            console.log('handleSuccess:');
+            handleSuccess(stream);
+        } catch (e) {
+            handleError(e);
+        }
+    }
+
+    function handleSuccess(stream) {
+        const video = $("#video")[0];
+        //获取视频轨道
+        const videoTracks = stream.getVideoTracks();
+        //读取视频资源名称
+        console.log(`视频资源名称: ${videoTracks[0].label}`);
+        window.stream = stream;
+        //将视频对象的源指定为stream
+        video.srcObject = stream;
+    }
+
+    //注意！！！！！！！！！！
+    //要使用webrtc，必须用https，要配置ssl，不然将无法获取到设备
+    function handleError(error) {
+        console.log('navigator.MediaDevices.getUserMedia error: ', error.message, error.name);
+    }
+</script>
+</body>
+</html>

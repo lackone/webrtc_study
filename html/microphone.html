@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>webrtc示例-打开麦克风</title>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <h1>
+                    <span>麦克风示例</span>
+                </h1>
+                <audio id="audio" controls autoPlay></audio>
+                <p class="p-3 rounded-2 text-bg-warning">警告: 如何没有使用头戴式耳机, 声音会反馈到扬声器.</p>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+
+    $(document).ready(function() {
+        openMicrophone()
+    })
+
+    //约束条件
+    const constraints = window.constraints = {
+        //禁用音频
+        audio: true,
+        //启用视频
+        video: false
+    };
+
+    async function openMicrophone() {
+        try {
+            //根据约束条件获取媒体
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('handleSuccess:');
+            handleSuccess(stream);
+        } catch (e) {
+            handleError(e);
+        }
+    }
+
+    function handleSuccess(stream) {
+        //获取audio对象
+        let audio = $("#audio");
+        //获取音频规道
+        const audioTracks = stream.getAudioTracks();
+        //获取音频设备名称
+        console.log('获取的音频设备为: ' + audioTracks[0].label);
+        //不活动状态
+        stream.oninactive = () => {
+            console.log('Stream停止');
+        };
+        window.stream = stream;
+        //将audio播放源指定为stream
+        audio[0].srcObject = stream;
+    }
+
+    //注意！！！！！！！！！！
+    //要使用webrtc，必须用https，要配置ssl，不然将无法获取到设备
+    function handleError(error) {
+        console.log('navigator.MediaDevices.getUserMedia error: ', error.message, error.name);
+    }
+</script>
+</body>
+</html>

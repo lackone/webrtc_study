@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>视频滤镜</title>
+    <style>
+        .video {
+            width: 100%; /* 宽度占满父容器 */
+            height: auto; /* 高度自动，保持原始宽高比 */
+            max-width: 100%; /* 防止超出容器 */
+            display: block; /* 去除底部空白间隙 */
+            background: #000; /* 可选：黑底，避免加载前白屏 */
+        }
+
+        .none {
+            -webkit-filter: none;
+            filter: none;
+        }
+
+        .blur {
+            -webkit-filter: blur(3px);
+            filter: blur(3px);
+        }
+
+        .grayscale {
+            -webkit-filter: grayscale(1);
+            filter: grayscale(1);
+        }
+
+        .invert {
+            -webkit-filter: invert(1);
+            filter: invert(1);
+        }
+
+        .sepia {
+            -webkit-filter: sepia(1);
+            filter: sepia(1);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <h1>
+                    <span>视频滤镜示例</span>
+                </h1>
+
+                <video class="video" id='video' playsInline autoPlay></video>
+                <br>
+                <select class="form-control" id="change">
+                    <option value="none">没有滤镜</option>
+                    <option value="blur">模糊</option>
+                    <option value="grayscale">灰度</option>
+                    <option value="invert">反转</option>
+                    <option value="sepia">深褐色</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+
+    $(document).ready(function () {
+        openVideo()
+    })
+
+    //约束条件
+    const constraints = window.constraints = {
+        //禁用音频
+        audio: false,
+        //启用视频
+        video: true
+    };
+
+    async function openVideo() {
+        try {
+            //根据约束条件获取媒体
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('handleSuccess:');
+            handleSuccess(stream);
+        } catch (e) {
+            handleError(e);
+        }
+    }
+
+    $("#change").on("change", function () {
+        let value = $(this).val();
+        let video = $("#video");
+        video[0].className = value;
+    })
+
+    function handleSuccess(stream) {
+        let video = $("#video");
+
+        video[0].srcObject = stream;
+    }
+
+    //注意！！！！！！！！！！
+    //要使用webrtc，必须用https，要配置ssl，不然将无法获取到设备
+    function handleError(error) {
+        console.log('navigator.MediaDevices.getUserMedia error: ', error.message, error.name);
+    }
+</script>
+</body>
+</html>

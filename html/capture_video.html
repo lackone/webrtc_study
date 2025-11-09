@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>捕获Video媒体流</title>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <h1>
+                    <span>捕获Video作为媒体流示例</span>
+                </h1>
+
+                <video id="sourceVideo" playsInline controls loop muted oncanplay="canplay()" style="width:100%;height:auto">
+                    <source src="res/123.mp4" type="video/mp4"/>
+                </video>
+
+                <video id="playerVideo" playsInline autoPlay style="width:100%;height:auto"></video>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    //开始播放
+    function canplay() {
+        //源视频对象
+        let sourceVideo = $("#sourceVideo")[0];
+        //播放视频对象
+        let playerVideo = $("#playerVideo")[0];
+
+        //MediaStream对象
+        let stream;
+        //捕获侦率
+        const fps = 0;
+        //浏览器兼容判断,捕获媒体流
+        if (sourceVideo.captureStream) {
+            stream = sourceVideo.captureStream(fps);
+        } else if (sourceVideo.mozCaptureStream) {
+            stream = sourceVideo.mozCaptureStream(fps);
+        } else {
+            console.error('captureStream不支持');
+            stream = null;
+        }
+        //将播放器源指定为stream
+        playerVideo.srcObject = stream;
+    }
+</script>
+</body>
+</html>

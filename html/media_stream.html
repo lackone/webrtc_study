@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>流与轨道API测试</title>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <h1>
+                    <span>MediaStreamAPI测试</span>
+                </h1>
+                <video class="video" id="video" autoPlay playsInline></video>
+                <br>
+                <button class="btn btn-primary" onClick="btnGetTracks()">获取所有轨道</button>
+                <button class="btn btn-primary" onClick="btnGetAudioTracks()">获取音频轨道</button>
+                <button class="btn btn-primary" onClick="btnGetTrackById()">根据Id获取音频轨道</button>
+                <button class="btn btn-primary" onClick="btnRemoveAudioTrack()">删除音频轨道</button>
+                <button class="btn btn-primary" onClick="btnGetVideoTracks()">获取视频轨道</button>
+                <button class="btn btn-primary" onClick="btnRemoveVideoTrack()">删除视频轨道</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    //MediaStream对象
+    let stream;
+
+    $(function () {
+        openDevice()
+    })
+
+    //打开音视频设备
+    async function openDevice() {
+        try {
+            //根据约束条件获取媒体
+            stream = await navigator.mediaDevices.getUserMedia({
+                //启用音频
+                audio: true,
+                //启用视频
+                video: true
+            });
+            let video = $("#video")[0];
+            video.srcObject = stream;
+        } catch (err) {
+            console.log(`getUserMedia错误:` + err);
+        }
+    }
+
+    //获取音频轨道列表
+    function btnGetAudioTracks() {
+        console.log("getAudioTracks");
+        //返回一个数据
+        console.log(stream.getAudioTracks());
+    }
+
+    //根据Id获取音频轨道
+    function btnGetTrackById() {
+        console.log("getTrackById");
+        console.log(stream.getTrackById(stream.getAudioTracks()[0].id));
+    }
+
+    //删除音频轨道
+    function btnRemoveAudioTrack() {
+        console.log("removeAudioTrack()");
+        stream.removeTrack(stream.getAudioTracks()[0]);
+    }
+
+    //获取所有轨道,包括音频及视频
+    function btnGetTracks() {
+        console.log("getTracks()");
+        console.log(stream.getTracks());
+    }
+
+    //获取视频轨道列表
+    function btnGetVideoTracks() {
+        console.log("getVideoTracks()");
+        console.log(stream.getVideoTracks());
+    }
+
+    //删除视频轨道
+    function btnRemoveVideoTrack() {
+        console.log("removeVideoTrack()");
+        stream.removeTrack(stream.getVideoTracks()[0]);
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/soundmeter.js"></script>
+    <title>媒体设置</title>
+</head>
+<body>
+<div class="container">
+    <div class="container text-center">
+        <div class="row">
+            <div class="col">
+                <div class="mb-3 row">
+                    <label class="col-sm-2 col-form-label">麦克风</label>
+                    <div class="col-sm-10">
+                        <select class="form-select" id="audio">
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-2 col-form-label"></label>
+                    <div class="col-sm-10">
+                        <div id="progressbar"
+                             style="width:0;height:10px;background-color:#8dc63f;margin-top:20px"></div>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-2 col-form-label">摄像头</label>
+                    <div class="col-sm-10">
+                        <select class="form-select" id="video">
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-2 col-form-label"></label>
+                    <div class="col-sm-10">
+                        <video id="previewVideo" autoPlay playsInline style="width:100%;height:100%;"></video>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <label class="col-sm-2 col-form-label">清晰度</label>
+                    <div class="col-sm-10">
+                        <select class="form-select" id="resolution">
+                            <option value="qvga">流畅(320x240)</option>
+                            <option value="vga">标清(640x360)</option>
+                            <option value="hd">高清(1280x720)</option>
+                            <option value="fullhd">超清(1920x1080)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3 row">
+                    <div class="col-2">
+                        <button class="btn btn-primary" onclick="stopPreview()">取消</button>
+                    </div>
+                    <div class="col-2">
+                        <button class="btn btn-primary" onclick="startPreview()">开始</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    //当前选择的音频输入设备
+    let selectedAudioDevice;
+    //当前选择的视频输入设备
+    let selectedVideoDevice;
+    //视频输入设备列表
+    let videoDevices = [];
+    //音频输入设备列表
+    let audioDevices = [];
+    //音频输出设备列表
+    let audioOutputDevices = [];
+    //分辨率
+    let resolution = 'vga';
+    //音频音量
+    let audioLevel = 0;
+
+    let soundMeter;
+
+    $(async function () {
+        try {
+            //AudioContext是用于管理和播放所有的声音
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            //实例化AudioContext
+            window.audioContext = new AudioContext();
+        } catch (e) {
+            console.log('网页音频API不支持.');
+        }
+
+        let data = await updateDevices()
+
+        if (selectedAudioDevice === "" && data.audioDevices.length > 0) {
+            selectedAudioDevice = data.audioDevices[0].deviceId
+        }
+        if (selectedVideoDevice === "" && data.videoDevices.length > 0) {
+            selectedVideoDevice = data.videoDevices[0].deviceId
+        }
+    })
+
+    $(document).on("change", "#audio", function () {
+        let val = $(this).val()
+        selectedAudioDevice = val;
+        setTimeout(test, 100);
+    })
+
+    $(document).on("change", "#video", function () {
+        let val = $(this).val()
+        selectedVideoDevice = val;
+        setTimeout(test, 100);
+    })
+
+    $(document).on("change", "#resolution", function () {
+        let val = $(this).val()
+        resolution = val;
+        setTimeout(test, 100);
+    })
+
+    function updateSelect(data) {
+        let html = "";
+
+        $("#audio").html(html);
+        for (let device of data.audioDevices) {
+            html += "<option value='" + device.deviceId + "'>" + "[" + device.deviceId + "] " + device.label + "</option>"
+        }
+        $("#audio").html(html);
+
+        html = "";
+        $("#video").html(html);
+        for (let device of data.videoDevices) {
+            html += "<option value='" + device.deviceId + "'>" + "[" + device.deviceId + "] " + device.label + "</option>"
+        }
+        $("#video").html(html);
+    }
+
+    async function updateDevices() {
+        try {
+            let devices = await navigator.mediaDevices.enumerateDevices()
+            //使用循环迭代设备列表
+            for (let device of devices) {
+                //过滤出视频输入设备
+                if (device.kind === 'videoinput') {
+                    videoDevices.push(device);
+                    //过滤出音频输入设备
+                } else if (device.kind === 'audioinput') {
+                    audioDevices.push(device);
+                    //过滤出音频输出设备
+                } else if (device.kind === 'audiooutput') {
+                    audioOutputDevices.push(device);
+                }
+            }
+
+            console.log(devices)
+
+            let data = {videoDevices, audioDevices, audioOutputDevices};
+
+            updateSelect(data);
+
+            return data
+        } catch (err) {
+            console.log(err)
+        }
+    }
+
+    //音频音量处理
+    function soundMeterProcess() {
+        //读取音量值,再乘以一个系数,可以得到音量条的宽度
+        audioLevel = (window.soundMeter.instant.toFixed(2) * 348) + 1;
+
+        $("#progressbar").width(audioLevel + 'px');
+
+        //每隔100毫秒调用一次soundMeterProcess函数,模拟实时检测音频音量
+        setTimeout(this.soundMeterProcess, 100);
+    }
+
+    //关闭音视频流
+    function closeMediaStream(stream) {
+        //判断stream是否为空
+        if (!stream) {
+            return;
+        }
+        var tracks, i, len;
+        //判断是否有getTracks方法
+        if (stream.getTracks) {
+            //获取所有的Track
+            tracks = stream.getTracks();
+            //迭代所有Track
+            for (i = 0, len = tracks.length; i < len; i += 1) {
+                //停止每个Track
+                tracks[i].stop();
+            }
+        } else {
+            //获取所有的音频Track
+            tracks = stream.getAudioTracks();
+            //迭代所有音频Track
+            for (i = 0, len = tracks.length; i < len; i += 1) {
+                //停止每个Track
+                tracks[i].stop();
+            }
+            //获取所有的视频Track
+            tracks = stream.getVideoTracks();
+            //迭代所有视频Track
+            for (i = 0, len = tracks.length; i < len; i += 1) {
+                //停止每个Track
+                tracks[i].stop();
+            }
+        }
+    }
+
+    function handleResolution() {
+        let width;
+        let height;
+        switch (resolution) {
+            case 'qvga':
+                width = 320;
+                height = 240;
+                break;
+            case 'vga':
+                width = 640;
+                height = 360;
+                break;
+            case 'hd':
+                width = 1280;
+                height = 720;
+                break;
+            case 'fullhd':
+                width = 1920;
+                height = 1080;
+                break;
+            default:
+                width = 640;
+                height = 360;
+                break;
+        }
+        return {width, height}
+    }
+
+    function stopPreview() {
+        //关闭音视频流
+        if (window.stream) {
+            closeMediaStream(window.stream);
+        }
+    }
+
+    function startPreview() {
+        //判断window对象里是否有stream
+        if (window.stream) {
+            //关闭音视频流
+            closeMediaStream(window.stream);
+        }
+
+        //SoundMeter声音测量,用于做声音音量测算使用的
+        soundMeter = window.soundMeter = new SoundMeter(window.audioContext);
+
+        let wh = handleResolution();
+
+        //视频预览对象
+        let videoElement = $("#previewVideo")[0];
+        //定义约束条件
+        let constraints = {
+            //设置音频设备Id
+            audio: {
+                deviceId: selectedAudioDevice ? {exact: selectedAudioDevice} : undefined
+            },
+            //设置视频设备Id
+            video: {
+                deviceId: selectedVideoDevice ? {exact: selectedVideoDevice} : undefined,
+                width: {exact: wh.width},
+                height: {exact: wh.height}
+            }
+        };
+        //根据约束条件获取数据流
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(function (stream) {
+                //成功返回音视频流
+                window.stream = stream;
+                videoElement.srcObject = stream;
+                //将声音测量对象与流连接起来
+                soundMeter.connectToSource(stream);
+                //每隔100毫秒调用一次soundMeterProcess函数,模拟实时检测音频音量
+                setTimeout(soundMeterProcess, 100);
+                //返回枚举设备
+                return navigator.mediaDevices.enumerateDevices();
+            })
+            .then((devces) => {
+            })
+            .catch((erro) => {
+            });
+    }
+</script>
+</body>
+</html>
