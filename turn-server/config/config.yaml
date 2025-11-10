@@ -1,0 +1,14 @@
+http:
+  ip: 0.0.0.0
+  port: 9000
+  mode: debug
+  cert: ./config/server.crt
+  key: ./config/server.key
+  turn_api_path: /api/turn
+  turn_key: 123456789
+
+
+turn:
+  public_ip: 127.0.0.1
+  port: 19302
+  realm: turn-server
