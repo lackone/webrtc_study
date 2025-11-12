@@ -23,3 +23,17 @@ html/peer_connection_canvas.html    流方式同步白板
 html/data_channel.html              发送文本消息
 html/data_channel_file.html         发送文件
 ```
+
+### 运行
+
+```
+cd p2p-server
+go run main.go
+
+cd turn-server
+go run main.go
+```
+
+相关配置在 config/config.yaml
+
+浏览器访问 https://127.0.0.1:8000/html/index.html
