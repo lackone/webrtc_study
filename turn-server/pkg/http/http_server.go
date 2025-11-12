@@ -10,6 +10,7 @@ import (
 	"webrtc/turn-server/pkg/config"
 	"webrtc/turn-server/pkg/turn"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,6 +29,17 @@ func NewHttpServer(ts *turn.TurnServer, cfg *config.Config) *HttpServer {
 	}
 
 	r := gin.Default()
+
+	// 配置 CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{
+			"*", // 允许这个来源
+		},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false, // 如果需要携带 cookie
+	}))
 
 	s := &HttpServer{
 		Engine: r,

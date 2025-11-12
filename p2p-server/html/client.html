@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>webrtc页面</title>
+    <style>
+        .video-card {
+            flex: 1;
+            min-width: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .video-wrapper {
+            width: 100%;
+            height: 480px; /* PC 端足够大 */
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        #localVideo,
+        #remoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* 手机端适配 */
+        @media (max-width: 991.98px) {
+            .video-wrapper {
+                height: 280px;
+            }
+        }
+
+        .user-item {
+            padding: 15px;
+            border: 1px solid #dcdcdc;
+        }
+    </style>
+</head>
+<body>
+<div class="container-fluid d-flex flex-column align-items-center justify-content-start min-vh-100 py-4">
+    <!-- 标题：始终在顶部 -->
+    <h2 class="mb-4">一对一视频通话</h2>
+
+    <!-- 用户列表（通话前显示） -->
+    <div class="w-100" style="max-width: 500px;" id="user-list-section">
+        <div id="user-list"></div>
+    </div>
+
+    <!-- 视频区域（默认隐藏，通话时显示） -->
+    <div class="w-100 mt-4" id="video-section">
+        <div class="video-container d-flex flex-column flex-lg-row gap-4 justify-content-center">
+            <!-- 本地视频 -->
+            <div class="video-card text-center">
+                <h5>本地视频</h5>
+                <div class="video-wrapper">
+                    <video id="localVideo" autoplay playsinline muted></video>
+                </div>
+            </div>
+
+            <!-- 远程视频 -->
+            <div class="video-card text-center">
+                <h5>远程视频</h5>
+                <div class="video-wrapper">
+                    <video id="remoteVideo" autoplay playsinline></video>
+                </div>
+            </div>
+        </div>
+
+        <!-- 控制按钮（放在视频下方，居中） -->
+        <div class="text-center mt-3">
+            <button onclick="handleVideoOnClick()" class="btn btn-primary me-2">打开/关闭摄像头</button>
+            <button onclick="handleAudioOnClick()" class="btn btn-primary me-2">打开/关闭麦克风</button>
+            <button onclick="handleHangUp()" class="btn btn-danger">挂断</button>
+        </div>
+    </div>
+</div>
+<script>
+    let localVideo;
+    let remoteVideo;
+    let p2pUrl = 'wss://' + window.location.hostname + ':8000/ws';
+    let turnUrl = 'https://' + window.location.hostname + ':9000/api/turn?service=turn&username=sample';
+    let p2pVideoCall = null;
+    //用户ID
+    let userId = "";
+    //房间号
+    let roomId = "";
+    //用户名
+    let username = "";
+    //用户列表
+    let userList = [];
+    //本地流
+    let localStream = null;
+    //远端流
+    let remoteStream = null;
+    //是否正在视频通话
+    let isVideoCall = false;
+    //禁用音频
+    let audioMuted = false;
+    //禁用视频
+    let videoMuted = false;
+
+    $(function () {
+        //获取共享数据
+        let shareData = sessionStorage.getItem('shareData');
+        if (!shareData) {
+            alert("请登录")
+            window.location.href = "/html/index.html";
+            return false
+        }
+        shareData = JSON.parse(shareData);
+        roomId = shareData.user.roomId;
+        username = shareData.user.username;
+
+        localVideo = $("#localVideo")[0]
+        remoteVideo = $("#remoteVideo")[0]
+
+        localVideo.onloadedmetadata = function (e) {
+            localVideo.play()
+        }
+
+        remoteVideo.onloadedmetadata = function (e) {
+            remoteVideo.play()
+        }
+
+        connectServer()
+    })
+
+    function connectServer() {
+        p2pVideoCall = new P2PVideo(p2pUrl, turnUrl, username, roomId);
+
+        //监听新本地流事件
+        p2pVideoCall.on('localstream', (stream) => {
+            localStream = stream
+            localVideo.srcObject = localStream
+        })
+
+        //监听新的呼叫事件
+        p2pVideoCall.on('newCall', (from, sessionId) => {
+            isVideoCall = true;
+        })
+
+        //监听新远端流添加事件
+        p2pVideoCall.on('addstream', (stream) => {
+            remoteStream = stream
+            remoteVideo.srcObject = remoteStream
+        })
+
+        //监听远端流移除事件
+        p2pVideoCall.on('removestream', (stream) => {
+            remoteStream = null;
+        })
+
+        //监听会话结束事件
+        p2pVideoCall.on('hangUp', (to, sessionId) => {
+            isVideoCall = false;
+            localStream = null;
+            remoteStream = null;
+        })
+
+        p2pVideoCall.on('leave', (to) => {
+            isVideoCall = false;
+            localStream = null;
+            remoteStream = null;
+        })
+
+        //更新用户列表事件
+        p2pVideoCall.on('updateUserList', (users, self) => {
+            userList = users;
+            userId = self;
+            handleUserList()
+        })
+    }
+
+    function handleUserList() {
+        let html = "";
+        for (let ix in userList) {
+            html += `
+                <div class="user-item">
+                    <p>
+                        用户名：${userList[ix].name} ID：${userList[ix].id}
+
+                        ${userList[ix].id == userId ? `<span style="color:red">本人</span>` : ``}
+                    </p>
+                    <div>
+                        <button class="btn btn-primary" onclick="handleStartCall('${userList[ix].id}', 'video')">视频</button>
+                        <button class="btn btn-primary" onclick="handleStartCall('${userList[ix].id}', 'screen')">共享桌面</button>
+                    </div>
+                </div>
+            `;
+        }
+        $("#user-list").html(html)
+    }
+
+    function handleStartCall(remoteUserId, type) {
+        p2pVideoCall.startCall(remoteUserId, type)
+    }
+
+    function handleHangUp() {
+        p2pVideoCall.hangUp()
+    }
+
+    function handleVideoOnClick() {
+        let muted = !videoMuted
+        handleToggleVideo(muted)
+        videoMuted = muted
+    }
+
+    function handleAudioOnClick() {
+        let muted = !audioMuted
+        handleToggleAudio(muted)
+        audioMuted = muted
+    }
+
+    function handleToggleVideo(muted) {
+        let tracks = localStream.getVideoTracks()
+        console.log("handleToggleVideo:", muted, tracks)
+        if (tracks.length === 0) {
+            alert("没有本地视频")
+            return
+        }
+        //循环迭代所有轨道
+        for (let i = 0; i < tracks.length; ++i) {
+            //设置每个轨道的enabled值
+            tracks[i].enabled = !muted;
+        }
+    }
+
+    function handleToggleAudio(muted) {
+        let tracks = localStream.getAudioTracks()
+        console.log("handleToggleAudio:", muted, tracks)
+        if (tracks.length === 0) {
+            alert("没有本地音频")
+            return
+        }
+        //循环迭代所有轨道
+        for (let i = 0; i < tracks.length; ++i) {
+            //设置每个轨道的enabled值
+            tracks[i].enabled = !muted;
+        }
+    }
+
+    class EventEmitter {
+        constructor() {
+            this.events = {};
+        }
+
+        // 监听事件
+        on(eventName, callback) {
+            if (!this.events[eventName]) {
+                this.events[eventName] = [];
+            }
+            this.events[eventName].push(callback);
+        }
+
+        // 取消监听（可选）
+        off(eventName, callback) {
+            if (this.events[eventName]) {
+                this.events[eventName] = this.events[eventName].filter(cb => cb !== callback);
+            }
+        }
+
+        // 触发事件
+        emit(eventName, ...args) {
+            if (this.events[eventName]) {
+                this.events[eventName].forEach(callback => {
+                    callback(...args);
+                });
+            }
+        }
+    }
+
+    class P2PVideo extends EventEmitter {
+        // 构造函数（初始化实例）
+        constructor(p2pUrl, turnUrl, name, roomId) {
+            super(); // 调用父类构造函数
+
+            //Socket
+            this.socket = null;
+            //所有PeerConnection
+            this.peerConns = {};
+            //会话Id
+            this.sessionId = "";
+            //自己Id
+            this.userId = 0;
+            //用户名
+            this.name = name;
+            //房间号
+            this.roomId = roomId;
+            //信令服务器url
+            this.p2pUrl = p2pUrl;
+            //中转服务器url
+            this.turnUrl = turnUrl;
+            //本地媒体流
+            this.localStream = null;
+
+            //RTCPeerConnection兼容性处理
+            this.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection || window.msRTCPeerConnection;
+            //RTCSessionDescription兼容性处理
+            this.RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription || window.msRTCSessionDescription;
+            //getUserMedia兼容性处理
+            this.GetUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia || navigator.msGetUserMedia;
+
+            //ICE配置
+            this.configuration = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
+
+            //获取TURN配置
+            get(this.turnUrl, {}).then(res => {
+                if (res.code === 200) {
+                    let cred = res.data
+                    this.configuration = {
+                        "iceServers": [
+                            {
+                                "url": cred['uris'][0],
+                                "username": cred['username'],
+                                "credential": cred['password'],
+                            }
+                        ],
+                    }
+                    console.log("configuration:", JSON.stringify(this.configuration))
+                }
+            }).catch(err => {
+                console.log("turn错误:", err)
+            })
+
+
+            //打开websocket
+            this.socket = new WebSocket(this.p2pUrl)
+
+            this.socket.onopen = () => {
+                console.log("ws连接成功")
+
+                this.userId = this.getRandomUserId()
+
+                //发送消息
+                this.send({
+                    type: 'joinRoom',
+                    data: {
+                        name: this.name,
+                        id: this.userId,
+                        room_id: this.roomId,
+                    }
+                })
+            };
+
+            this.socket.onmessage = (e) => {
+                let msg = JSON.parse(e.data)
+
+                console.log("收到的消息:", msg)
+
+                switch (msg.type) {
+                    case 'offer':
+                        this.OnOffer(msg)
+                        break;
+                    case 'answer':
+                        this.OnAnswer(msg)
+                        break;
+                    case 'candidate':
+                        this.OnCandidate(msg)
+                        break;
+                    case 'hangUp':
+                        this.OnHangUp(msg)
+                        break;
+                    case 'leaveRoom':
+                        this.OnLeaveRoom(msg)
+                        break;
+                    case 'updateUserList':
+                        this.OnUpdateUserList(msg)
+                        break;
+                    case 'heartbeat':
+                        this.OnHeartbeat(msg)
+                        break;
+                }
+            }
+
+            this.socket.onerror = (e) => {
+                console.log("ws错误:", e.data)
+            }
+
+            this.socket.onclose = (e) => {
+                console.log("ws关闭:", e.data)
+            }
+        }
+
+        //获取本地媒体流
+        getLocalStream(type) {
+            switch (type) {
+                case 'screen':
+                    return navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            width: {ideal: 1280},
+                            height: {ideal: 720}
+                        },
+                        audio: true
+                    });
+                case 'video':
+                    return navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: type === 'video' ? {
+                            width: {ideal: 1280},
+                            height: {ideal: 720}
+                        } : false
+                    });
+                case 'audio':
+                    return navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: false
+                    });
+            }
+        }
+
+        //获取6位随机id
+        getRandomUserId() {
+            let num = "";
+            for (let i = 0; i < 6; i++) {
+                num += Math.floor(Math.random() * 10);
+            }
+            return num;
+        }
+
+        //remoteUserId 为被呼叫的Id
+        //type 为会话类型 音频|视频|共享桌面
+        startCall(remoteUserId, type) {
+            this.sessionId = this.userId + '-' + remoteUserId
+
+            this.getLocalStream(type).then((stream) => {
+                this.localStream = stream
+
+                this.createPeerConn(remoteUserId, type, true, stream);
+
+                //派发本地流事件
+                this.emit('localstream', stream);
+
+                //派发新的呼叫事件
+                this.emit('newCall', this.userId, this.sessionId);
+            })
+        }
+
+        //挂断处理
+        hangUp() {
+            this.send({
+                type: 'hangUp',
+                data: {
+                    session_id: this.sessionId,
+                    from: this.userId,
+                    room_id: this.roomId
+                }
+            })
+        }
+
+        /**
+         * 创建PeerConnection
+         * remoteUserId:对方Id
+         * type:媒体类型
+         * isOffer:true是提议方|false是应答方
+         * localstream:本地媒体流
+         */
+        createPeerConn(remoteUserId, type, isOffer, localstream) {
+            console.log("创建 RTCPeerConnection ...")
+
+            let peer = new RTCPeerConnection(this.configuration)
+
+            this.peerConns["" + remoteUserId] = peer;
+
+            peer.onicecandidate = (event) => {
+                if (event.candidate) {
+                    //将自己的Candidate发送给对方
+                    this.send({
+                        type: 'candidate',
+                        data: {
+                            to: remoteUserId, //对方Id
+                            from: this.userId, //自己Id
+                            candidate: { //Candidate数据
+                                'sdpMLineIndex': event.candidate.sdpMLineIndex,
+                                'sdpMid': event.candidate.sdpMid,
+                                'candidate': event.candidate.candidate,
+                            },
+                            session_id: this.sessionId,
+                            room_id: this.roomId
+                        }
+                    })
+                }
+            }
+
+            peer.onnegotiationneeded = () => {
+                console.log('onnegotiationneeded');
+            }
+
+            peer.oniceconnectionstatechange = (event) => {
+                console.log('oniceconnectionstatechange', event);
+            };
+
+            peer.onsignalingstatechange = (event) => {
+                console.log('onsignalingstatechange', event);
+            };
+
+            //远端流到达
+            peer.ontrack = (event) => {
+                console.log('ontrack', event);
+
+                const remoteStream = event.streams[0];
+
+                if (!remoteStream) {
+                    return
+                }
+
+                // 通知应用层：新远端流到达
+                this.emit('addstream', remoteStream);
+
+                // 监听流是否变为 inactive（所有轨道结束）
+                remoteStream.addEventListener('inactive', () => {
+                    this.emit('removestream', remoteStream);
+                });
+            };
+
+            // 添加本地流添加到 PeerConnection
+            localstream.getTracks().forEach(track => {
+                peer.addTrack(track, localstream);
+            });
+
+
+            // 如果是提议方，创建 Offer
+            if (isOffer) {
+                this.createOffer(peer, remoteUserId, type);
+            }
+
+            return peer
+        }
+
+        /**
+         * 创建提议Offer
+         * peer:PeerConnection对象
+         * remoteUserId:对方Id
+         * type:媒体类型
+         */
+        createOffer(peer, remoteUserId, type) {
+            peer.createOffer((desc) => {
+                console.log("createOffer:", desc.sdp)
+
+                //设置本地SDP
+                peer.setLocalDescription(desc, () => {
+                    //发送消息
+                    this.send({
+                        type: 'offer',
+                        data: {
+                            to: remoteUserId, //对方Id
+                            from: this.userId, //本地Id
+                            session_id: this.sessionId, //会话Id
+                            type: type,  //媒体类型
+                            room_id: this.roomId, //房间Id
+                            //SDP信息
+                            description: {'sdp': desc.sdp, 'type': desc.type},
+                        }
+                    })
+                }, this.logError)
+            }, this.logError)
+        }
+
+        logError(err) {
+            console.log("logError:", err)
+        }
+
+        //提议方把offer发过来
+        OnOffer(msg) {
+            console.log("OnOffer")
+
+            let data = msg.data
+            let desc = data.description
+            let from = data.from
+            let type = data.type
+            //谁先发起call，session_id就是谁的
+            //A发起，就是 A-B
+            //B发起，就是 B-A
+            this.sessionId = data.session_id
+
+            this.emit('newCall', from, this.sessionId)
+
+            //应答方，获取本地流
+            this.getLocalStream(type).then((stream) => {
+                this.localStream = stream
+
+                //通知应用层本地媒体流
+                this.emit('localstream', stream)
+
+                //应答方创建连接PeerConnection
+                let peer = this.createPeerConn(from, type, false, stream)
+
+                if (peer && desc) {
+                    //应答方设置远端SDP
+                    peer.setRemoteDescription(new RTCSessionDescription(desc), () => {
+                        if (peer.remoteDescription.type === "offer") {
+                            //生成应答
+                            peer.createAnswer((de) => {
+                                console.log("createAnswer:", de)
+
+                                //设置本地SDP
+                                peer.setLocalDescription(de, () => {
+                                    console.log("setLocalDescription:", peer.localDescription)
+
+                                    //发送消息
+                                    this.send({
+                                        type: 'answer',
+                                        data: {
+                                            to: from,
+                                            from: this.userId,
+                                            //SDP信息
+                                            description: {'sdp': de.sdp, 'type': de.type},
+                                            session_id: this.sessionId,
+                                            room_id: this.roomId,
+                                            type: type
+                                        }
+                                    })
+                                }, this.logError)
+
+                            }, this.logError)
+                        }
+
+                    }, this.logError)
+                }
+            })
+        }
+
+        OnAnswer(msg) {
+            console.log("OnAnswer")
+
+            let data = msg.data
+            let from = data.from
+            let peer = null
+            if (from in this.peerConns) {
+                peer = this.peerConns[from]
+            }
+            if (peer && data.description) {
+                //设置远端SDP
+                peer.setRemoteDescription(new RTCSessionDescription(data.description), () => {
+
+                }, this.logError)
+            }
+        }
+
+        OnCandidate(msg) {
+            let data = msg.data
+            let from = data.from
+            let peer = null
+            if (from in this.peerConns) {
+                peer = this.peerConns[from]
+            }
+            //添加Candidate到PC对象中
+            if (peer && data.candidate) {
+                peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        }
+
+        OnHangUp(msg) {
+            let data = msg.data
+            let ids = data.session_id.split("-")
+            let to = data.to
+
+            let peerA = this.peerConns[ids[0]]
+            let peerB = this.peerConns[ids[1]]
+
+            if (peerA !== undefined) {
+                console.log("本地关闭")
+                peerA.close()
+
+                delete this.peerConns[ids[0]]
+            }
+            if (peerB !== undefined) {
+                console.log("远程关闭")
+                peerB.close()
+
+                delete this.peerConns[ids[1]]
+            }
+            //关闭媒体流
+            if (this.localStream !== null) {
+                this.closeMediaStream(this.localStream);
+                this.localStream = null;
+            }
+
+            this.emit("hangUp", to, this.sessionId)
+            this.sessionId = ""
+        }
+
+        OnLeaveRoom(msg) {
+            let id = msg.data //离开用户ID
+            let peer = this.peerConns[id]
+            if (peer !== undefined) {
+                peer.close();
+
+                delete this.peerConns[id];
+
+                this.emit('leave', id)
+            }
+            //关闭媒体流
+            if (this.localStream !== null) {
+                this.closeMediaStream(this.localStream);
+                this.localStream = null;
+            }
+        }
+
+        OnUpdateUserList(msg) {
+            let data = msg.data
+
+            console.log("OnUpdateUserList:", data)
+
+            this.emit("updateUserList", data, this.userId)
+        }
+
+        OnHeartbeat(msg) {
+            //console.log("OnHeartbeat:", msg)
+        }
+
+        closeMediaStream(stream) {
+            if (!stream) {
+                return
+            }
+            //获取所有的轨道
+            let tracks = stream.getTracks();
+            //循环迭代所有轨道并停止
+            for (let i = 0, len = tracks.length; i < len; i++) {
+                tracks[i].stop();
+            }
+        }
+
+        //发送消息
+        send(data) {
+            this.socket.send(JSON.stringify(data))
+        }
+    }
+
+    /**
+     * 封装 GET 请求（基于 fetch）
+     * @param url
+     * @param params
+     * @param options
+     * @returns {Promise<any>}
+     */
+    function get(url, params = {}, options = {}) {
+        // 1. 拼接查询参数
+        const queryString = new URLSearchParams(params).toString();
+        const fullUrl = queryString ? `${url}?${queryString}` : url;
+
+        // 2. 默认配置
+        const config = {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                // 可根据需要添加 token 等
+            },
+            ...options
+        };
+
+        // 3. 发起请求
+        return fetch(fullUrl, config)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json(); // 假设返回 JSON
+            })
+            .catch(error => {
+                console.error('GET 请求失败:', error);
+                throw error; // 重新抛出，让调用者处理
+            });
+    }
+</script>
+</body>
+</html>

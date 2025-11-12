@@ -1,0 +1,14 @@
+http:
+  ip: 0.0.0.0
+  port: 8000
+  mode: debug
+  cert: ./config/server.crt
+  key: ./config/server.key
+  html_root: ./html
+  ws_path: /ws
+
+Log:
+  path: ./logs/app.log
+
+Ws:
+  heartbeat_time: 5

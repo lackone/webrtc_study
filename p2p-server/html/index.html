@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <title>登录页</title>
+</head>
+<body>
+<div class="container-fluid d-flex align-items-center justify-content-center min-vh-100">
+    <div class="row w-100">
+        <div class="col-md-6 col-lg-4 mx-auto">
+            <form>
+                <div class="row mb-3">
+                    <label for="username" class="col-sm-3 col-form-label">用户名</label>
+                    <div class="col-sm-9">
+                        <input type="text" name="username" class="form-control" id="username" autocomplete="false">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <label for="roomId" class="col-sm-3 col-form-label">房间号</label>
+                    <div class="col-sm-9">
+                        <input type="text" name="roomId" class="form-control" id="roomId" autocomplete="false">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-9 offset-sm-3">
+                        <button id="submit" class="btn btn-primary">登录</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    $("#submit").on("click", function () {
+        let roomId = $("#roomId").val()
+        let username = $("#username").val()
+
+        if (!username) {
+            alert("请填写用户名")
+            return false
+        }
+        if (!roomId) {
+            alert("请填写房间号")
+            return false
+        }
+
+        const data = {
+            user: {
+                roomId: roomId,
+                username: username
+            }
+        }
+        sessionStorage.setItem('shareData', JSON.stringify(data))
+
+        window.location.href = "/html/client.html";
+
+        return false
+    })
+</script>
+</body>
+</html>
