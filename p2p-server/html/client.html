@@ -195,6 +195,7 @@
                     </p>
                     <div>
                         <button class="btn btn-primary" onclick="handleStartCall('${userList[ix].id}', 'video')">视频</button>
+                        <button class="btn btn-primary" onclick="handleStartCall('${userList[ix].id}', 'audio')">音频</button>
                         <button class="btn btn-primary" onclick="handleStartCall('${userList[ix].id}', 'screen')">共享桌面</button>
                     </div>
                 </div>
@@ -311,6 +312,11 @@
             this.RTCSessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription || window.msRTCSessionDescription;
             //getUserMedia兼容性处理
             this.GetUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia || navigator.msGetUserMedia;
+
+            if (!this.RTCPeerConnection) {
+                alert('不支持RTCPeerConnection')
+                return
+            }
 
             //ICE配置
             this.configuration = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
@@ -444,6 +450,8 @@
 
                 //派发新的呼叫事件
                 this.emit('newCall', this.userId, this.sessionId);
+            }).catch((err) => {
+                alert(err)
             })
         }
 
@@ -469,7 +477,7 @@
         createPeerConn(remoteUserId, type, isOffer, localstream) {
             console.log("创建 RTCPeerConnection ...")
 
-            let peer = new RTCPeerConnection(this.configuration)
+            let peer = new this.RTCPeerConnection(this.configuration)
 
             this.peerConns["" + remoteUserId] = peer;
 
@@ -598,7 +606,7 @@
 
                 if (peer && desc) {
                     //应答方设置远端SDP
-                    peer.setRemoteDescription(new RTCSessionDescription(desc), () => {
+                    peer.setRemoteDescription(new this.RTCSessionDescription(desc), () => {
                         if (peer.remoteDescription.type === "offer") {
                             //生成应答
                             peer.createAnswer((de) => {
@@ -642,7 +650,7 @@
             }
             if (peer && data.description) {
                 //设置远端SDP
-                peer.setRemoteDescription(new RTCSessionDescription(data.description), () => {
+                peer.setRemoteDescription(new this.RTCSessionDescription(data.description), () => {
 
                 }, this.logError)
             }
