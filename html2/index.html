@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>webrtc</title>
+    <style>
+        .none {
+            -webkit-filter: none;
+        }
+        .blur {
+            -webkit-filter: blur(3px);
+        }
+        .grayscale {
+            -webkit-filter: grayscale(1);
+        }
+        .invert {
+            -webkit-filter: invert(1);
+        }
+        .sepia {
+            -webkit-filter: sepia(1);
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay muted playsinline></video>
+    <button id="cut">截图</button>
+    <canvas id="canvas"></canvas>
+</body>
+<script src="js/client.js"></script>
+</html>
